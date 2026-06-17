@@ -4,7 +4,12 @@ import environ
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 env = environ.Env()
-environ.Env.read_env(BASE_DIR.parent / ".env")
+# In the container BASE_DIR == /app (backend/ mounted); locally it's the backend/ folder.
+# Fall back to the parent (monorepo root) so local dev without Docker still works.
+_env_file = BASE_DIR / ".env"
+if not _env_file.exists():
+    _env_file = BASE_DIR.parent / ".env"
+environ.Env.read_env(_env_file)
 
 SECRET_KEY = env("SECRET_KEY")
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["localhost"])

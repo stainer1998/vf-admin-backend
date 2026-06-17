@@ -20,7 +20,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: python manage.py runserver 0.0.0.0:8000
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py runserver 0.0.0.0:8000"
     working_dir: /app
     volumes:
       - .:/app
@@ -33,6 +35,7 @@ services:
         condition: service_healthy
 
   frontend:
+    profiles: ["frontend"]
     build:
       context: ../frontend
       dockerfile: Dockerfile
