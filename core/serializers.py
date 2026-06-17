@@ -1,20 +1,21 @@
 from rest_framework import serializers
-from .models import FondoReparticion, InterpretacionDisco, NivelEquipo
+
+from .models import AllocationFund, DiskInterpretation, EquipmentLevel
 
 
-class FondoReparticionSerializer(serializers.ModelSerializer):
+class AllocationFundSerializer(serializers.ModelSerializer):
     class Meta:
-        model = FondoReparticion
-        fields = "__all__"
+        model = AllocationFund
+        fields = ["id", "name", "slug", "description", "color", "order", "is_active", "percentage"]
 
 
-class InterpretacionDiscoSerializer(serializers.ModelSerializer):
+class DiskInterpretationSerializer(serializers.ModelSerializer):
     class Meta:
-        model = InterpretacionDisco
-        fields = "__all__"
+        model = DiskInterpretation
+        fields = ["id", "pattern", "manufacturer", "capacity", "rpm", "disk_type"]
 
 
-class NivelEquipoSerializer(serializers.ModelSerializer):
+class EquipmentLevelSerializer(serializers.ModelSerializer):
     class Meta:
-        model = NivelEquipo
-        fields = "__all__"
+        model = EquipmentLevel
+        fields = ["id", "name", "description", "order"]
