@@ -1,6 +1,8 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
+from django.db import models
 from rest_framework import generics, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView
@@ -28,7 +30,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
 
 class UsuarioViewSet(viewsets.ModelViewSet):
-    queryset = User.objects.prefetch_related("groups__profile").all()
+    queryset = User.objects.prefetch_related("groups__profile", "user_permissions__content_type").all()
     permission_classes = [IsAdminUser]
     search_fields = ["username", "email", "first_name", "last_name"]
     filterset_fields = ["is_active", "rol"]
@@ -39,6 +41,20 @@ class UsuarioViewSet(viewsets.ModelViewSet):
         if self.action in ("list", "retrieve"):
             return UsuarioSerializer
         return UsuarioCreateSerializer
+
+    @action(detail=True, methods=["get"], url_path="effective-permissions")
+    def effective_permissions(self, request, pk=None):
+        user = self.get_object()
+        perms = (
+            Permission.objects.select_related("content_type")
+            .filter(content_type__app_label__in=VF_APPS)
+            .filter(
+                models.Q(user=user) | models.Q(group__user=user)
+            )
+            .distinct()
+            .order_by("content_type__app_label", "content_type__model", "codename")
+        )
+        return Response(PermissionSerializer(perms, many=True).data)
 
 
 class GroupViewSet(viewsets.ModelViewSet):

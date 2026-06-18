@@ -116,28 +116,34 @@ class GroupLightSerializer(serializers.ModelSerializer):
 # ── Usuarios ──────────────────────────────────────────────────────────────────
 
 class UsuarioSerializer(serializers.ModelSerializer):
-    groups = GroupLightSerializer(many=True, read_only=True)
+    groups           = GroupLightSerializer(many=True, read_only=True)
+    user_permissions = PermissionSerializer(many=True, read_only=True)
 
     class Meta:
         model  = User
         fields = [
             "id", "username", "email", "first_name", "last_name",
             "rol", "is_active", "is_staff", "date_joined", "groups",
+            "user_permissions",
         ]
         read_only_fields = ["date_joined"]
 
 
 class UsuarioCreateSerializer(serializers.ModelSerializer):
-    password  = serializers.CharField(write_only=True, min_length=8, required=False, allow_blank=True)
-    group_ids = serializers.PrimaryKeyRelatedField(
+    password       = serializers.CharField(write_only=True, min_length=8, required=False, allow_blank=True)
+    group_ids      = serializers.PrimaryKeyRelatedField(
         queryset=Group.objects.all(), many=True, write_only=True, required=False, source="groups"
+    )
+    permission_ids = serializers.PrimaryKeyRelatedField(
+        queryset=Permission.objects.all(), many=True, write_only=True, required=False,
+        source="user_permissions",
     )
 
     class Meta:
         model  = User
         fields = [
             "id", "username", "email", "first_name", "last_name",
-            "rol", "is_active", "is_staff", "password", "group_ids",
+            "rol", "is_active", "is_staff", "password", "group_ids", "permission_ids",
         ]
 
     def validate_password(self, value):
@@ -146,18 +152,22 @@ class UsuarioCreateSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
-        password = validated_data.pop("password")
-        groups   = validated_data.pop("groups", [])
+        password         = validated_data.pop("password")
+        groups           = validated_data.pop("groups", [])
+        user_permissions = validated_data.pop("user_permissions", [])
         user = User(**validated_data)
         user.set_password(password)
         user.save()
         if groups:
             user.groups.set(groups)
+        if user_permissions:
+            user.user_permissions.set(user_permissions)
         return user
 
     def update(self, instance, validated_data):
-        password = validated_data.pop("password", None)
-        groups   = validated_data.pop("groups", None)
+        password         = validated_data.pop("password", None)
+        groups           = validated_data.pop("groups", None)
+        user_permissions = validated_data.pop("user_permissions", None)
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         if password:
@@ -165,6 +175,8 @@ class UsuarioCreateSerializer(serializers.ModelSerializer):
         instance.save()
         if groups is not None:
             instance.groups.set(groups)
+        if user_permissions is not None:
+            instance.user_permissions.set(user_permissions)
         return instance
 
 
