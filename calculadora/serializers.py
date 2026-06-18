@@ -120,6 +120,9 @@ class ParametrosSerializer(serializers.ModelSerializer):
     costo_por_hora = serializers.DecimalField(
         max_digits=12, decimal_places=2, read_only=True
     )
+    usuario_actualizacion_nombre = serializers.CharField(
+        source="usuario_actualizacion.get_full_name", read_only=True
+    )
 
     class Meta:
         model = ParametrosCalculadora
@@ -133,7 +136,29 @@ class ParametrosSerializer(serializers.ModelSerializer):
             "desgaste_herramientas_default",
             "costo_por_hora",
             "fecha_actualizacion",
+            "usuario_actualizacion_nombre",
         ]
+
+
+class ParametrosWriteSerializer(serializers.Serializer):
+    sueldo_objetivo_mensual = serializers.DecimalField(
+        max_digits=12, decimal_places=2, min_value=Decimal("0")
+    )
+    costos_fijos_mensuales = serializers.DecimalField(
+        max_digits=12, decimal_places=2, min_value=Decimal("0")
+    )
+    horas_productivas_mensuales = serializers.DecimalField(
+        max_digits=6, decimal_places=2, min_value=Decimal("1")
+    )
+    porcentaje_garantia_default = serializers.DecimalField(
+        max_digits=5, decimal_places=2, min_value=Decimal("0"), max_value=Decimal("100")
+    )
+    transporte_base_default = serializers.DecimalField(
+        max_digits=10, decimal_places=2, min_value=Decimal("0")
+    )
+    desgaste_herramientas_default = serializers.DecimalField(
+        max_digits=10, decimal_places=2, min_value=Decimal("0")
+    )
 
 
 class HistorialSerializer(serializers.ModelSerializer):
