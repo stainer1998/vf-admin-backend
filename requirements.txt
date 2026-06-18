@@ -7,5 +7,6 @@ django-cors-headers==4.6.*
 drf-spectacular==0.28.*
 mysqlclient==2.2.*
 gunicorn==23.*
+django-extensions==3.2.*
 pydantic>=2.0
 unidecode>=1.3

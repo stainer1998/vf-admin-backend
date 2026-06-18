@@ -103,6 +103,8 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+AUTH_USER_MODEL = "usuarios.UsuarioVF"
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
@@ -125,6 +127,7 @@ from datetime import timedelta
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(seconds=env.int("JWT_ACCESS_TOKEN_LIFETIME", default=3600)),
     "REFRESH_TOKEN_LIFETIME": timedelta(seconds=env.int("JWT_REFRESH_TOKEN_LIFETIME", default=86400)),
+    "TOKEN_OBTAIN_SERIALIZER": "usuarios.serializers.CustomTokenObtainPairSerializer",
 }
 
 SPECTACULAR_SETTINGS = {
