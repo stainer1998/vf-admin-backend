@@ -13,6 +13,7 @@ class Service(models.Model):
     )
     is_active = models.BooleanField(default=True)
     notes = models.TextField(blank=True)
+    metadata_calculo = models.JSONField(null=True, blank=True)
 
     @property
     def gross_profit(self):

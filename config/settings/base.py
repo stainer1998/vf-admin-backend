@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     "trabajos",
     "finanzas",
     "usuarios",
+    "calculadora",
 ]
 
 MIDDLEWARE = [
