@@ -4,7 +4,8 @@ from django.db import models
 class FinancialTransaction(models.Model):
     INCOME = "INCOME"
     EXPENSE = "EXPENSE"
-    TYPE_CHOICES = [(INCOME, "Income"), (EXPENSE, "Expense")]
+    ADJUSTMENT = "ADJUSTMENT"
+    TYPE_CHOICES = [(INCOME, "Income"), (EXPENSE, "Expense"), (ADJUSTMENT, "Adjustment")]
 
     transaction_type = models.CharField(max_length=10, choices=TYPE_CHOICES)
     date = models.DateField()

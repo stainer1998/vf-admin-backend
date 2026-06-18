@@ -1,17 +1,26 @@
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group, Permission
 from rest_framework import generics, status, viewsets
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView
 
+from .models import GroupProfile
 from .serializers import (
     CambiarPasswordSerializer,
     CustomTokenObtainPairSerializer,
+    GroupSerializer,
+    PermissionSerializer,
     UsuarioCreateSerializer,
     UsuarioSerializer,
 )
 
 User = get_user_model()
+
+VF_APPS = [
+    "clientes", "equipos", "diagnosticos", "catalogo",
+    "inventario", "cotizaciones", "trabajos", "finanzas", "core", "usuarios",
+]
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -19,7 +28,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
 
 class UsuarioViewSet(viewsets.ModelViewSet):
-    queryset = User.objects.all()
+    queryset = User.objects.prefetch_related("groups__profile").all()
     permission_classes = [IsAdminUser]
     search_fields = ["username", "email", "first_name", "last_name"]
     filterset_fields = ["is_active", "rol"]
@@ -30,6 +39,38 @@ class UsuarioViewSet(viewsets.ModelViewSet):
         if self.action in ("list", "retrieve"):
             return UsuarioSerializer
         return UsuarioCreateSerializer
+
+
+class GroupViewSet(viewsets.ModelViewSet):
+    queryset = Group.objects.prefetch_related("profile", "permissions__content_type").all()
+    serializer_class = GroupSerializer
+    permission_classes = [IsAdminUser]
+    ordering = ["name"]
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        try:
+            if instance.profile.is_system:
+                return Response(
+                    {"detail": "No se puede eliminar un grupo del sistema."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+        except GroupProfile.DoesNotExist:
+            pass
+        return super().destroy(request, *args, **kwargs)
+
+
+class PermissionListView(generics.ListAPIView):
+    serializer_class = PermissionSerializer
+    permission_classes = [IsAdminUser]
+    pagination_class = None
+
+    def get_queryset(self):
+        return (
+            Permission.objects.select_related("content_type")
+            .filter(content_type__app_label__in=VF_APPS)
+            .order_by("content_type__app_label", "content_type__model", "codename")
+        )
 
 
 class MeView(generics.RetrieveUpdateAPIView):
