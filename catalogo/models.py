@@ -26,3 +26,19 @@ class Service(models.Model):
 
     def __str__(self):
         return f"{self.code} — {self.name}"
+
+
+class ServiceMaterial(models.Model):
+    service = models.ForeignKey(
+        Service, on_delete=models.CASCADE, related_name="materials"
+    )
+    product = models.ForeignKey(
+        "inventario.Product", on_delete=models.CASCADE, related_name="service_materials"
+    )
+    default_quantity = models.PositiveIntegerField(default=1)
+
+    class Meta:
+        unique_together = [("service", "product")]
+
+    def __str__(self):
+        return f"{self.service.code} → {self.product.code} ×{self.default_quantity}"

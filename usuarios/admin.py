@@ -1,13 +1,16 @@
 from django.contrib import admin
-from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from django.contrib.auth import get_user_model
+from django.contrib.auth.admin import UserAdmin
 
-User = get_user_model()
-
-admin.site.unregister(User)
+from .models import UsuarioVF
 
 
-@admin.register(User)
-class UserAdmin(BaseUserAdmin):
-    list_display = ["username", "email", "first_name", "last_name", "is_staff", "is_active"]
-    list_filter = ["is_staff", "is_active", "is_superuser"]
+@admin.register(UsuarioVF)
+class UsuarioVFAdmin(UserAdmin):
+    list_display  = ["username", "email", "first_name", "last_name", "rol", "is_staff", "is_active"]
+    list_filter   = ["rol", "is_staff", "is_active", "is_superuser"]
+    fieldsets     = UserAdmin.fieldsets + (
+        ("Rol VF", {"fields": ("rol",)}),
+    )
+    add_fieldsets = UserAdmin.add_fieldsets + (
+        ("Rol VF", {"fields": ("rol",)}),
+    )
