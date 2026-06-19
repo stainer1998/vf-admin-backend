@@ -21,6 +21,38 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
             return WorkOrderListSerializer
         return WorkOrderSerializer
 
+    @action(detail=False, methods=["get"])
+    def dashboard(self, request):
+        from django.db.models import Count
+
+        status_counts = dict(
+            WorkOrder.objects.values_list("work_status")
+            .annotate(n=Count("id"))
+            .values_list("work_status", "n")
+        )
+        ready = (
+            WorkOrder.objects.filter(work_status="READY")
+            .select_related("client", "equipment")
+            .order_by("intake_date")[:10]
+        )
+        pending = (
+            WorkOrder.objects.filter(payment_status="PENDING")
+            .exclude(work_status="DELIVERED")
+            .select_related("client", "equipment")
+            .order_by("intake_date")[:10]
+        )
+        return Response(
+            {
+                "counts": {
+                    "received": status_counts.get("RECEIVED", 0),
+                    "in_progress": status_counts.get("IN_PROGRESS", 0),
+                    "ready": status_counts.get("READY", 0),
+                },
+                "ready_list": WorkOrderListSerializer(ready, many=True).data,
+                "pending_payment": WorkOrderListSerializer(pending, many=True).data,
+            }
+        )
+
     @action(detail=False, methods=["post"], url_path="from-quote/(?P<quote_id>[^/.]+)")
     def from_quote(self, request, quote_id=None):
         """Create a work order by copying lines from an approved quote."""

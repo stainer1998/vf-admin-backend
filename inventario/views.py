@@ -1,4 +1,6 @@
 from rest_framework import viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
 
 from .models import InventoryMovement, Product, ProductCategory, Supplier
 from .serializers import (
@@ -30,6 +32,28 @@ class ProductViewSet(viewsets.ModelViewSet):
     search_fields = ["code", "name"]
     ordering_fields = ["code", "name", "sale_price", "purchase_price"]
     ordering = ["code"]
+
+    @action(detail=False, methods=["get"], url_path="out-of-stock")
+    def out_of_stock(self, request):
+        from django.db.models import Case, F, IntegerField, Q, Sum, Value, When
+
+        qs = (
+            Product.objects.filter(category__is_stockable=True)
+            .annotate(
+                computed_stock=Sum(
+                    Case(
+                        When(movements__movement_type="ENTRY", then=F("movements__quantity")),
+                        When(movements__movement_type="EXIT", then=-F("movements__quantity")),
+                        When(movements__movement_type="ADJUSTMENT", then=F("movements__quantity")),
+                        default=Value(0),
+                        output_field=IntegerField(),
+                    )
+                )
+            )
+            .filter(Q(computed_stock__lte=0) | Q(computed_stock__isnull=True))
+            .select_related("category")
+        )
+        return Response(ProductSerializer(qs, many=True).data)
 
 
 class InventoryMovementViewSet(viewsets.ModelViewSet):
