@@ -27,3 +27,19 @@ class EquipmentViewSet(viewsets.ModelViewSet):
         equipment = Equipment.all_objects.get(pk=pk)
         equipment.restore()
         return Response(EquipmentSerializer(equipment).data)
+
+    @action(detail=True, methods=["delete"], url_path="hard-delete")
+    def hard_delete(self, request, pk=None):
+        from django.db.models import ProtectedError
+
+        password = request.data.get("password", "")
+        if not request.user.check_password(password):
+            return Response({"password": "Contraseña incorrecta."}, status=400)
+        try:
+            Equipment.all_objects.filter(pk=pk).delete()
+        except ProtectedError:
+            return Response(
+                {"detail": "No se puede eliminar: el equipo tiene órdenes de trabajo o cotizaciones asociadas."},
+                status=409,
+            )
+        return Response(status=204)
