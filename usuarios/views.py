@@ -61,6 +61,7 @@ class GroupViewSet(viewsets.ModelViewSet):
     queryset = Group.objects.prefetch_related("profile", "permissions__content_type").all()
     serializer_class = GroupSerializer
     permission_classes = [IsAdminUser]
+    pagination_class = None
     ordering = ["name"]
 
     def destroy(self, request, *args, **kwargs):
