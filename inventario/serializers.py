@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import InventoryMovement, Product, ProductCategory, Supplier
+from .models import Brand, InventoryMovement, Product, ProductCategory, Supplier
 
 
 class ProductCategorySerializer(serializers.ModelSerializer):
@@ -15,11 +15,18 @@ class SupplierSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "notes"]
 
 
+class BrandSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Brand
+        fields = ["id", "name"]
+
+
 class ProductSerializer(serializers.ModelSerializer):
     margin = serializers.SerializerMethodField()
     stock = serializers.SerializerMethodField()
     category_name = serializers.CharField(source="category.name", read_only=True)
-    supplier_name = serializers.CharField(source="supplier.name", read_only=True)
+    supplier_name = serializers.CharField(source="supplier.name", read_only=True, default="")
+    brand_name = serializers.CharField(source="brand.name", read_only=True, default="")
 
     class Meta:
         model = Product
@@ -29,6 +36,9 @@ class ProductSerializer(serializers.ModelSerializer):
             "name",
             "category",
             "category_name",
+            "brand",
+            "brand_name",
+            "model",
             "purchase_price",
             "sale_price",
             "margin",

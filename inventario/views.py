@@ -2,13 +2,20 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from .models import InventoryMovement, Product, ProductCategory, Supplier
+from .models import Brand, InventoryMovement, Product, ProductCategory, Supplier
 from .serializers import (
+    BrandSerializer,
     InventoryMovementSerializer,
     ProductCategorySerializer,
     ProductSerializer,
     SupplierSerializer,
 )
+
+
+class BrandViewSet(viewsets.ModelViewSet):
+    queryset = Brand.objects.all().order_by("name")
+    serializer_class = BrandSerializer
+    search_fields = ["name"]
 
 
 class ProductCategoryViewSet(viewsets.ModelViewSet):
@@ -26,7 +33,7 @@ class SupplierViewSet(viewsets.ModelViewSet):
 
 
 class ProductViewSet(viewsets.ModelViewSet):
-    queryset = Product.objects.select_related("category", "supplier").all()
+    queryset = Product.objects.select_related("category", "supplier", "brand").all()
     serializer_class = ProductSerializer
     filterset_fields = ["category", "supplier"]
     search_fields = ["code", "name"]
