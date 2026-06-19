@@ -23,5 +23,6 @@ class ClientSerializer(serializers.ModelSerializer):
             "source",
             "created_at",
             "updated_at",
+            "deleted_at",
         ]
-        read_only_fields = ["identity_key", "created_at", "updated_at"]
+        read_only_fields = ["identity_key", "created_at", "updated_at", "deleted_at"]
