@@ -6,6 +6,7 @@ from django.db.models import Case, F, IntegerField, Sum, When
 
 class ProductCategory(models.Model):
     name = models.CharField(max_length=100, unique=True)
+    code_prefix = models.CharField(max_length=4, blank=True)
     is_stockable = models.BooleanField(default=True)
     description = models.TextField(blank=True)
 
@@ -64,10 +65,28 @@ class Product(models.Model):
         return result["total"] or 0
 
     def save(self, *args, **kwargs):
+        import re
         is_new = self.pk is None
         super().save(*args, **kwargs)
         if is_new and not self.code:
-            code = f'PRD-{self.pk:04d}'
+            label = self.category.code_prefix if self.category_id else ''
+            if label:
+                prefix_str = f'PRD-{label}-'
+                existing = (
+                    Product.objects
+                    .filter(code__startswith=prefix_str)
+                    .exclude(pk=self.pk)
+                    .values_list('code', flat=True)
+                )
+                numbers = [
+                    int(m.group(1))
+                    for c in existing
+                    if (m := re.match(r'PRD-\w+-(\d+)$', c))
+                ]
+                next_num = max(numbers, default=0) + 1
+                code = f'PRD-{label}-{next_num:03d}'
+            else:
+                code = f'PRD-{self.pk:04d}'
             Product.objects.filter(pk=self.pk).update(code=code)
             self.code = code
 

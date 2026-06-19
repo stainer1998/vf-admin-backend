@@ -6,7 +6,7 @@ from .models import InventoryMovement, Product, ProductCategory, Supplier
 class ProductCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductCategory
-        fields = ["id", "name", "is_stockable", "description"]
+        fields = ["id", "name", "code_prefix", "is_stockable", "description"]
 
 
 class SupplierSerializer(serializers.ModelSerializer):
