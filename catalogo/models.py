@@ -43,3 +43,32 @@ class ServiceMaterial(models.Model):
 
     def __str__(self):
         return f"{self.service.code} → {self.product.code} ×{self.default_quantity}"
+
+
+class ServiceRequiredCategory(models.Model):
+    """
+    Vincula un servicio con una categoría de producto, para que al usar el
+    servicio en una OT o cotización el técnico seleccione el insumo concreto
+    de esa categoría. Si billable=False el insumo es consumible interno y no
+    se agrega como línea de cobro al cliente.
+    """
+
+    service = models.ForeignKey(
+        Service, on_delete=models.CASCADE, related_name="required_categories"
+    )
+    category = models.ForeignKey(
+        "inventario.ProductCategory",
+        on_delete=models.PROTECT,
+        related_name="service_requirements",
+    )
+    label = models.CharField(max_length=100, blank=True)
+    billable = models.BooleanField(default=True)
+    default_quantity = models.PositiveSmallIntegerField(default=1)
+
+    class Meta:
+        unique_together = [("service", "category")]
+        ordering = ["-billable", "label"]
+
+    def __str__(self):
+        tag = "billable" if self.billable else "interno"
+        return f"{self.service.code} → {self.category.name} ({tag})"

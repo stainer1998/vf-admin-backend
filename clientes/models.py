@@ -12,11 +12,11 @@ class Client(models.Model):
     SOURCE_CHOICES = [(LOOKOUT, "Lookout"), (MANUAL, "Manual")]
 
     type = models.CharField(max_length=10, choices=TYPE_CHOICES)
-    first_name = models.CharField(max_length=100)
-    last_name = models.CharField(max_length=100)
+    first_name = models.CharField(max_length=100, blank=True)
+    last_name = models.CharField(max_length=100, blank=True)
     second_last_name = models.CharField(max_length=100, blank=True)
     identity_key = models.CharField(max_length=200, unique=True, db_index=True)
-    phone = models.CharField(max_length=30)
+    phone = models.CharField(max_length=30, blank=True)
     email = models.EmailField(blank=True)
     rut = models.CharField(max_length=20, blank=True)
     company_name = models.CharField(max_length=200, blank=True)

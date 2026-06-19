@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Service, ServiceMaterial
+from .models import Service, ServiceMaterial, ServiceRequiredCategory
 
 
 class ServiceMaterialSerializer(serializers.ModelSerializer):
@@ -26,10 +26,19 @@ class ServiceMaterialSerializer(serializers.ModelSerializer):
         ]
 
 
+class ServiceRequiredCategorySerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source="category.name", read_only=True)
+
+    class Meta:
+        model = ServiceRequiredCategory
+        fields = ["id", "category", "category_name", "label", "billable", "default_quantity"]
+
+
 class ServiceSerializer(serializers.ModelSerializer):
     gross_profit = serializers.SerializerMethodField()
     margin = serializers.SerializerMethodField()
     materials = ServiceMaterialSerializer(many=True, required=False)
+    required_categories = ServiceRequiredCategorySerializer(many=True, required=False)
 
     class Meta:
         model = Service
@@ -45,6 +54,7 @@ class ServiceSerializer(serializers.ModelSerializer):
             "is_active",
             "notes",
             "materials",
+            "required_categories",
         ]
 
     def get_gross_profit(self, obj):
@@ -74,15 +84,31 @@ class ServiceSerializer(serializers.ModelSerializer):
         # Remove materials not in the incoming set
         service.materials.filter(product_id__in=(set(existing) - incoming_ids)).delete()
 
+    def _save_required_categories(self, service, categories_data):
+        service.required_categories.all().delete()
+        for item in categories_data:
+            ServiceRequiredCategory.objects.create(
+                service=service,
+                category=item["category"],
+                label=item.get("label", ""),
+                billable=item.get("billable", True),
+                default_quantity=item.get("default_quantity", 1),
+            )
+
     def create(self, validated_data):
         materials_data = validated_data.pop("materials", [])
+        categories_data = validated_data.pop("required_categories", [])
         service = super().create(validated_data)
         self._save_materials(service, materials_data)
+        self._save_required_categories(service, categories_data)
         return service
 
     def update(self, instance, validated_data):
         materials_data = validated_data.pop("materials", None)
+        categories_data = validated_data.pop("required_categories", None)
         service = super().update(instance, validated_data)
         if materials_data is not None:
             self._save_materials(service, materials_data)
+        if categories_data is not None:
+            self._save_required_categories(service, categories_data)
         return service
