@@ -1,5 +1,11 @@
 from django.db import models
+from django.utils import timezone
 from vf_core.normalize import normalize
+
+
+class EquipmentManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().filter(deleted_at__isnull=True)
 
 
 class Equipment(models.Model):
@@ -33,6 +39,18 @@ class Equipment(models.Model):
     is_ambiguous = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    deleted_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
+    objects = EquipmentManager()
+    all_objects = models.Manager()
+
+    def delete(self, *args, **kwargs):
+        self.deleted_at = timezone.now()
+        self.save(update_fields=["deleted_at"])
+
+    def restore(self):
+        self.deleted_at = None
+        self.save(update_fields=["deleted_at"])
 
     def _compute_identity_key(self):
         if self.serial_number:
