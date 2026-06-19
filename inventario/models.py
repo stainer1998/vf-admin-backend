@@ -25,7 +25,7 @@ class Supplier(models.Model):
 
 
 class Product(models.Model):
-    code = models.CharField(max_length=20, unique=True)
+    code = models.CharField(max_length=20, unique=True, blank=True)
     name = models.CharField(max_length=200)
     category = models.ForeignKey(
         ProductCategory, on_delete=models.PROTECT, related_name="products"
@@ -62,6 +62,14 @@ class Product(models.Model):
             )
         )
         return result["total"] or 0
+
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+        if is_new and not self.code:
+            code = f'PRD-{self.pk:04d}'
+            Product.objects.filter(pk=self.pk).update(code=code)
+            self.code = code
 
     def __str__(self):
         return f"{self.code} — {self.name}"

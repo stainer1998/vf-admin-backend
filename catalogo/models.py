@@ -4,7 +4,7 @@ from django.db import models
 
 
 class Service(models.Model):
-    code = models.CharField(max_length=20, unique=True)
+    code = models.CharField(max_length=20, unique=True, blank=True)
     name = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     sale_price = models.DecimalField(max_digits=10, decimal_places=2)
@@ -24,6 +24,14 @@ class Service(models.Model):
         if not self.sale_price:
             return Decimal("0")
         return (self.gross_profit / self.sale_price * 100).quantize(Decimal("0.01"))
+
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+        if is_new and not self.code:
+            code = f'SRV-{self.pk:04d}'
+            Service.objects.filter(pk=self.pk).update(code=code)
+            self.code = code
 
     def __str__(self):
         return f"{self.code} — {self.name}"
