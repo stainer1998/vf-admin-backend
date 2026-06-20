@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import AllocationFund, DiskInterpretation, EquipmentLevel
+from .models import AllocationFund, DiskInterpretation, EquipmentLevel, EmpresaConfig
 
 
 @admin.register(AllocationFund)
@@ -23,3 +23,8 @@ class DiskInterpretationAdmin(admin.ModelAdmin):
 class EquipmentLevelAdmin(admin.ModelAdmin):
     list_display = ["name", "order", "description"]
     list_editable = ["order"]
+
+
+@admin.register(EmpresaConfig)
+class EmpresaConfigAdmin(admin.ModelAdmin):
+    list_display = ["nombre", "email", "telefono", "sitio_web"]

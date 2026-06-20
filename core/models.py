@@ -54,3 +54,24 @@ class EquipmentLevel(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class EmpresaConfig(models.Model):
+    nombre = models.CharField(max_length=255, default="VF Digital Solutions")
+    slogan = models.CharField(max_length=255, blank=True, default="Atención directa, soluciones reales.")
+    email = models.EmailField(blank=True)
+    telefono = models.CharField(max_length=30, blank=True)
+    direccion = models.TextField(blank=True)
+    sitio_web = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        verbose_name = "Configuración de empresa"
+        verbose_name_plural = "Configuración de empresa"
+
+    def __str__(self):
+        return self.nombre
+
+    @classmethod
+    def get_instance(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj

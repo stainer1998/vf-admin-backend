@@ -1,10 +1,12 @@
 from rest_framework import viewsets
+from rest_framework.generics import RetrieveUpdateAPIView
 
-from .models import AllocationFund, DiskInterpretation, EquipmentLevel
+from .models import AllocationFund, DiskInterpretation, EquipmentLevel, EmpresaConfig
 from .serializers import (
     AllocationFundSerializer,
     DiskInterpretationSerializer,
     EquipmentLevelSerializer,
+    EmpresaConfigSerializer,
 )
 
 
@@ -25,3 +27,10 @@ class EquipmentLevelViewSet(viewsets.ModelViewSet):
     queryset = EquipmentLevel.objects.all()
     serializer_class = EquipmentLevelSerializer
     ordering_fields = ["order", "name"]
+
+
+class EmpresaConfigView(RetrieveUpdateAPIView):
+    serializer_class = EmpresaConfigSerializer
+
+    def get_object(self):
+        return EmpresaConfig.get_instance()

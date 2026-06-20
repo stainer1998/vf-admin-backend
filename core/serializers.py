@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import AllocationFund, DiskInterpretation, EquipmentLevel
+from .models import AllocationFund, DiskInterpretation, EquipmentLevel, EmpresaConfig
 
 
 class AllocationFundSerializer(serializers.ModelSerializer):
@@ -19,3 +19,9 @@ class EquipmentLevelSerializer(serializers.ModelSerializer):
     class Meta:
         model = EquipmentLevel
         fields = ["id", "name", "description", "order"]
+
+
+class EmpresaConfigSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EmpresaConfig
+        fields = ["nombre", "slogan", "email", "telefono", "direccion", "sitio_web"]
