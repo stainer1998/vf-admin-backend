@@ -117,6 +117,258 @@ class FinancialTransactionViewSet(viewsets.ModelViewSet):
             },
         })
 
+    @action(detail=False, methods=["get"])
+    def indicadores(self, request):
+        """Financial health indicators: MoM trend, avg ticket, collection rate, run rate."""
+        from trabajos.models import WorkOrder, WorkOrderLine
+        from django.db.models import ExpressionWrapper, F
+
+        today = date.today()
+
+        # ── Mes actual ──────────────────────────────────────────────────────────
+        mes_actual_inicio = date(today.year, today.month, 1)
+
+        # ── Mes anterior ────────────────────────────────────────────────────────
+        if today.month == 1:
+            mes_ant_inicio = date(today.year - 1, 12, 1)
+        else:
+            mes_ant_inicio = date(today.year, today.month - 1, 1)
+        mes_ant_fin = mes_actual_inicio - timedelta(days=1)
+
+        # ── Ingresos mes actual y anterior ──────────────────────────────────────
+        def income_between(d_from, d_to):
+            return float(
+                FinancialTransaction.objects
+                .filter(date__gte=d_from, date__lte=d_to, transaction_type=FinancialTransaction.INCOME)
+                .aggregate(t=Sum("amount"))["t"] or Decimal("0")
+            )
+
+        income_actual = income_between(mes_actual_inicio, today)
+        income_anterior = income_between(mes_ant_inicio, mes_ant_fin)
+
+        variacion_mom = round(
+            (income_actual - income_anterior) / income_anterior * 100, 1
+        ) if income_anterior > 0 else None
+
+        # ── Promedio ingresos 3 meses anteriores ────────────────────────────────
+        meses_3m: list[float] = []
+        for i in range(1, 4):
+            m = today.month - i
+            y = today.year
+            while m <= 0:
+                m += 12
+                y -= 1
+            inicio = date(y, m, 1)
+            fin_m = mes_actual_inicio - timedelta(days=1) if i == 1 else date(y, m % 12 + 1, 1) - timedelta(days=1)
+            # Recalculate fin_m correctly
+            next_m = m + 1
+            next_y = y
+            if next_m > 12:
+                next_m = 1
+                next_y += 1
+            fin_m = date(next_y, next_m, 1) - timedelta(days=1)
+            meses_3m.append(income_between(inicio, fin_m))
+
+        income_3m_avg = sum(meses_3m) / 3 if meses_3m else 0
+
+        variacion_vs_3m = round(
+            (income_actual - income_3m_avg) / income_3m_avg * 100, 1
+        ) if income_3m_avg > 0 else None
+
+        # ── Ticket promedio ──────────────────────────────────────────────────────
+        def avg_ticket(ots_qs):
+            tickets = [float(ot.amount_charged) for ot in ots_qs]
+            return round(sum(tickets) / len(tickets), 2) if tickets else 0
+
+        ots_pagadas_mes = WorkOrder.objects.filter(
+            intake_date__gte=mes_actual_inicio,
+            payment_status=WorkOrder.PAID,
+        )
+        ots_pagadas_ant = WorkOrder.objects.filter(
+            intake_date__gte=mes_ant_inicio,
+            intake_date__lte=mes_ant_fin,
+            payment_status=WorkOrder.PAID,
+        )
+
+        ticket_mes = avg_ticket(ots_pagadas_mes)
+        ticket_anterior = avg_ticket(ots_pagadas_ant)
+
+        variacion_ticket = round(
+            (ticket_mes - ticket_anterior) / ticket_anterior * 100, 1
+        ) if ticket_anterior > 0 else None
+
+        # ── Tasa de cobro (OTs entregadas últimos 60 días) ──────────────────────
+        hace_60 = today - timedelta(days=60)
+        ots_entregadas = WorkOrder.objects.filter(
+            work_status=WorkOrder.DELIVERED,
+            intake_date__gte=hace_60,
+        )
+        total_entregadas = ots_entregadas.count()
+        pagadas_entregadas = ots_entregadas.filter(payment_status=WorkOrder.PAID).count()
+        tasa_cobro = round(pagadas_entregadas / total_entregadas * 100, 1) if total_entregadas > 0 else 100.0
+        ots_sin_cobrar = total_entregadas - pagadas_entregadas
+
+        # ── Run rate anual ───────────────────────────────────────────────────────
+        dias_transcurridos = today.day
+        next_m = today.month % 12 + 1
+        next_y = today.year + (1 if today.month == 12 else 0)
+        dias_mes = (date(next_y, next_m, 1) - timedelta(days=1)).day
+        run_rate_mensual = income_actual / dias_transcurridos * dias_mes if dias_transcurridos > 0 else 0
+        run_rate_anual = round(run_rate_mensual * 12, 2)
+
+        # ── OTs del mes ─────────────────────────────────────────────────────────
+        ots_mes = WorkOrder.objects.filter(intake_date__gte=mes_actual_inicio)
+        ots_mes_total = ots_mes.count()
+        ots_mes_pagadas = ots_mes.filter(payment_status=WorkOrder.PAID).count()
+
+        return Response({
+            "income_mes_actual": round(income_actual, 2),
+            "income_mes_anterior": round(income_anterior, 2),
+            "variacion_mom": variacion_mom,
+            "income_3m_avg": round(income_3m_avg, 2),
+            "variacion_vs_3m": variacion_vs_3m,
+            "ticket_promedio_mes": ticket_mes,
+            "ticket_promedio_anterior": ticket_anterior,
+            "variacion_ticket": variacion_ticket,
+            "tasa_cobro": tasa_cobro,
+            "ots_sin_cobrar": ots_sin_cobrar,
+            "run_rate_anual": run_rate_anual,
+            "ots_mes_total": ots_mes_total,
+            "ots_mes_pagadas": ots_mes_pagadas,
+        })
+
+    @action(detail=False, methods=["get"])
+    def reporte(self, request):
+        """Financial report for a given period. tipo: resumen | fondos | transacciones."""
+        import csv
+        from io import StringIO
+        from django.http import StreamingHttpResponse
+
+        date_from_str = request.query_params.get("date_from")
+        date_to_str = request.query_params.get("date_to")
+        tipo = request.query_params.get("tipo", "resumen")
+
+        if not date_from_str or not date_to_str:
+            return Response({"error": "date_from y date_to son requeridos."}, status=400)
+
+        try:
+            from datetime import datetime
+            date_from = datetime.strptime(date_from_str, "%Y-%m-%d").date()
+            date_to = datetime.strptime(date_to_str, "%Y-%m-%d").date()
+        except ValueError:
+            return Response({"error": "Formato de fecha inválido. Use YYYY-MM-DD."}, status=400)
+
+        base_qs = FinancialTransaction.objects.filter(date__gte=date_from, date__lte=date_to)
+
+        if tipo == "fondos":
+            result_fondos = []
+            for fund in AllocationFund.objects.filter(is_active=True):
+                creditos = FundMovement.objects.filter(
+                    fund=fund, movement_type=FundMovement.CREDIT, date__gte=date_from, date__lte=date_to
+                ).aggregate(t=Sum("amount"))["t"] or Decimal("0")
+                debitos = FundMovement.objects.filter(
+                    fund=fund, movement_type=FundMovement.DEBIT, date__gte=date_from, date__lte=date_to
+                ).aggregate(t=Sum("amount"))["t"] or Decimal("0")
+                movimientos = list(
+                    FundMovement.objects
+                    .filter(fund=fund, date__gte=date_from, date__lte=date_to)
+                    .order_by("date")
+                    .values("date", "movement_type", "amount", "reference")
+                )
+                result_fondos.append({
+                    "fund_id": fund.pk,
+                    "fund_name": fund.name,
+                    "color": fund.color,
+                    "creditos": float(creditos),
+                    "debitos": float(debitos),
+                    "neto": float(creditos - debitos),
+                    "movimientos": [
+                        {
+                            "date": str(m["date"]),
+                            "movement_type": m["movement_type"],
+                            "amount": float(m["amount"]),
+                            "reference": m["reference"],
+                        }
+                        for m in movimientos
+                    ],
+                })
+            return Response({"tipo": "fondos", "date_from": date_from_str, "date_to": date_to_str, "fondos": result_fondos})
+
+        if tipo == "transacciones":
+            txs = list(
+                base_qs
+                .select_related("work_order")
+                .order_by("date")
+                .values("date", "transaction_type", "description", "amount", "work_order_id")
+            )
+            totals = base_qs.values("transaction_type").annotate(total=Sum("amount"))
+            totals_map = {r["transaction_type"]: float(r["total"]) for r in totals}
+            return Response({
+                "tipo": "transacciones",
+                "date_from": date_from_str,
+                "date_to": date_to_str,
+                "transacciones": [
+                    {
+                        "date": str(t["date"]),
+                        "transaction_type": t["transaction_type"],
+                        "description": t["description"],
+                        "amount": float(t["amount"]),
+                        "work_order_id": t["work_order_id"],
+                    }
+                    for t in txs
+                ],
+                "totales": {
+                    "income": totals_map.get("INCOME", 0),
+                    "expense": totals_map.get("EXPENSE", 0),
+                    "adjustment": totals_map.get("ADJUSTMENT", 0),
+                },
+            })
+
+        # tipo == "resumen" (default)
+        monthly_qs = (
+            base_qs
+            .annotate(month=TruncMonth("date"))
+            .values("month", "transaction_type")
+            .annotate(total=Sum("amount"))
+            .order_by("month")
+        )
+        monthly_map: dict[str, dict] = {}
+        for row in monthly_qs:
+            key = row["month"].strftime("%Y-%m")
+            if key not in monthly_map:
+                monthly_map[key] = {"month": key, "income": 0, "expense": 0, "adjustment": 0}
+            t = row["transaction_type"]
+            if t == FinancialTransaction.INCOME:
+                monthly_map[key]["income"] = float(row["total"])
+            elif t == FinancialTransaction.EXPENSE:
+                monthly_map[key]["expense"] = float(row["total"])
+            else:
+                monthly_map[key]["adjustment"] = float(row["total"])
+
+        meses = []
+        for m in sorted(monthly_map.values(), key=lambda x: x["month"]):
+            m["net"] = m["income"] - m["expense"]
+            meses.append(m)
+
+        totales_periodo = base_qs.values("transaction_type").annotate(total=Sum("amount"))
+        tm = {r["transaction_type"]: float(r["total"]) for r in totales_periodo}
+        total_income = tm.get("INCOME", 0)
+        total_expense = tm.get("EXPENSE", 0)
+        n_meses = len(meses) or 1
+
+        return Response({
+            "tipo": "resumen",
+            "date_from": date_from_str,
+            "date_to": date_to_str,
+            "totales": {
+                "income": total_income,
+                "expense": total_expense,
+                "net": total_income - total_expense,
+                "avg_monthly_income": round(total_income / n_meses, 2),
+            },
+            "por_mes": meses,
+        })
+
     @action(detail=False, methods=["post"])
     def cash_adjustment(self, request):
         """Register a manual cash injection or withdrawal."""
