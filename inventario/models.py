@@ -32,6 +32,26 @@ class Brand(models.Model):
         return self.name
 
 
+class ProductSupplier(models.Model):
+    product = models.ForeignKey(
+        "Product", on_delete=models.CASCADE, related_name="product_suppliers"
+    )
+    supplier = models.ForeignKey(
+        Supplier, on_delete=models.CASCADE, related_name="product_suppliers"
+    )
+    purchase_price = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True
+    )
+    is_preferred = models.BooleanField(default=False)
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        unique_together = [("product", "supplier")]
+
+    def __str__(self):
+        return f"{self.product} — {self.supplier}"
+
+
 class Product(models.Model):
     code = models.CharField(max_length=20, unique=True, blank=True)
     name = models.CharField(max_length=200)
@@ -44,12 +64,11 @@ class Product(models.Model):
     model = models.CharField(max_length=100, blank=True)
     purchase_price = models.DecimalField(max_digits=10, decimal_places=2)
     sale_price = models.DecimalField(max_digits=10, decimal_places=2)
-    supplier = models.ForeignKey(
+    suppliers = models.ManyToManyField(
         Supplier,
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
+        through="ProductSupplier",
         related_name="products",
+        blank=True,
     )
     notes = models.TextField(blank=True)
 

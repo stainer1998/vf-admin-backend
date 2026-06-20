@@ -1,8 +1,9 @@
+from django.db.models import Prefetch
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from .models import Brand, InventoryMovement, Product, ProductCategory, Supplier
+from .models import Brand, InventoryMovement, Product, ProductCategory, ProductSupplier, Supplier
 from .serializers import (
     BrandSerializer,
     InventoryMovementSerializer,
@@ -32,10 +33,23 @@ class SupplierViewSet(viewsets.ModelViewSet):
     ordering_fields = ["name"]
 
 
+def _product_suppliers_prefetch():
+    return Prefetch(
+        "product_suppliers",
+        queryset=ProductSupplier.objects.select_related("supplier").order_by(
+            "-is_preferred", "supplier__name"
+        ),
+    )
+
+
 class ProductViewSet(viewsets.ModelViewSet):
-    queryset = Product.objects.select_related("category", "supplier", "brand").all()
+    queryset = (
+        Product.objects.select_related("category", "brand")
+        .prefetch_related(_product_suppliers_prefetch())
+        .all()
+    )
     serializer_class = ProductSerializer
-    filterset_fields = ["category", "supplier"]
+    filterset_fields = ["category", "suppliers"]
     search_fields = ["code", "name"]
     ordering_fields = ["code", "name", "sale_price", "purchase_price"]
     ordering = ["code"]
@@ -59,6 +73,7 @@ class ProductViewSet(viewsets.ModelViewSet):
             )
             .filter(Q(computed_stock__lte=0) | Q(computed_stock__isnull=True))
             .select_related("category")
+            .prefetch_related(_product_suppliers_prefetch())
         )
         return Response(ProductSerializer(qs, many=True).data)
 

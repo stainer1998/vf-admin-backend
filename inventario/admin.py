@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import InventoryMovement, Product, ProductCategory, Supplier
+from .models import InventoryMovement, Product, ProductCategory, ProductSupplier, Supplier
 
 
 @admin.register(ProductCategory)
@@ -16,6 +16,12 @@ class SupplierAdmin(admin.ModelAdmin):
     search_fields = ["name"]
 
 
+class ProductSupplierInline(admin.TabularInline):
+    model = ProductSupplier
+    extra = 0
+    fields = ["supplier", "purchase_price", "is_preferred", "notes"]
+
+
 class InventoryMovementInline(admin.TabularInline):
     model = InventoryMovement
     extra = 0
@@ -29,10 +35,10 @@ class ProductAdmin(admin.ModelAdmin):
         "code", "name", "category", "purchase_price", "sale_price",
         "margin_display", "stock_display",
     ]
-    list_filter = ["category", "supplier"]
+    list_filter = ["category", "suppliers"]
     search_fields = ["code", "name"]
     readonly_fields = ["margin_display", "stock_display"]
-    inlines = [InventoryMovementInline]
+    inlines = [ProductSupplierInline, InventoryMovementInline]
 
     @admin.display(description="Margin %")
     def margin_display(self, obj):
