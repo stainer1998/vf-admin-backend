@@ -12,7 +12,7 @@ class ProductCategorySerializer(serializers.ModelSerializer):
 class SupplierSerializer(serializers.ModelSerializer):
     class Meta:
         model = Supplier
-        fields = ["id", "name", "notes"]
+        fields = ["id", "name", "phone", "website", "address", "comuna", "city", "notes"]
 
 
 class BrandSerializer(serializers.ModelSerializer):

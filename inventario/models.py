@@ -19,6 +19,11 @@ class ProductCategory(models.Model):
 
 class Supplier(models.Model):
     name = models.CharField(max_length=200)
+    phone = models.CharField(max_length=30, blank=True)
+    website = models.CharField(max_length=255, blank=True)
+    address = models.CharField(max_length=255, blank=True)
+    comuna = models.CharField(max_length=100, blank=True)
+    city = models.CharField(max_length=100, blank=True)
     notes = models.TextField(blank=True)
 
     def __str__(self):
