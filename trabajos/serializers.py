@@ -57,6 +57,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             "adjustment",
             "work_description",
             "notes",
+            "fault_type",
             "amount_charged",
             "lines",
         ]
@@ -102,6 +103,7 @@ class WorkOrderListSerializer(serializers.ModelSerializer):
             "delivery_date",
             "work_status",
             "payment_status",
+            "fault_type",
             "amount_charged",
         ]
 

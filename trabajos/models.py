@@ -29,6 +29,29 @@ class WorkOrder(models.Model):
         (PAYMENT_OTHER, "Other"),
     ]
 
+    STORAGE = "STORAGE"
+    SCREEN = "SCREEN"
+    BATTERY = "BATTERY"
+    MOTHERBOARD = "MOTHERBOARD"
+    KEYBOARD = "KEYBOARD"
+    RAM = "RAM"
+    COOLING = "COOLING"
+    SOFTWARE = "SOFTWARE"
+    CONNECTIVITY = "CONNECTIVITY"
+    FAULT_OTHER = "OTHER"
+    FAULT_TYPE_CHOICES = [
+        (STORAGE, "Almacenamiento / disco"),
+        (SCREEN, "Pantalla"),
+        (BATTERY, "Batería"),
+        (MOTHERBOARD, "Placa madre"),
+        (KEYBOARD, "Teclado / entrada"),
+        (RAM, "Memoria RAM"),
+        (COOLING, "Sistema de enfriamiento"),
+        (SOFTWARE, "Software / Sistema operativo"),
+        (CONNECTIVITY, "Conectividad"),
+        (FAULT_OTHER, "Otro"),
+    ]
+
     client = models.ForeignKey(
         "clientes.Client", on_delete=models.PROTECT, related_name="work_orders"
     )
@@ -59,6 +82,9 @@ class WorkOrder(models.Model):
     )
     work_description = models.TextField(blank=True)
     notes = models.TextField(blank=True)
+    fault_type = models.CharField(
+        max_length=20, choices=FAULT_TYPE_CHOICES, blank=True, default=""
+    )
 
     @property
     def amount_charged(self):
