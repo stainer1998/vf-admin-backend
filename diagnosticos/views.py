@@ -1,4 +1,5 @@
-from rest_framework import viewsets
+from pydantic import ValidationError
+from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
@@ -9,6 +10,7 @@ from .serializers import (
     ManualCorrectionSerializer,
     StorageDeviceSerializer,
 )
+from .services import import_lookout_json
 
 
 class DiagnosisViewSet(viewsets.ModelViewSet):
@@ -27,6 +29,18 @@ class DiagnosisViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(imported_by=self.request.user)
+
+    @action(detail=False, methods=["post"], url_path="import")
+    def import_lookout(self, request):
+        data = request.data
+        if not isinstance(data, dict):
+            return Response({"detail": "Se esperaba un objeto JSON."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            diagnosis, created = import_lookout_json(data, request.user)
+        except ValidationError as exc:
+            return Response({"detail": "JSON inválido.", "errors": exc.errors()}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = DiagnosisSerializer(diagnosis)
+        return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
     @action(detail=True, methods=["post"])
     def correct(self, request, pk=None):
