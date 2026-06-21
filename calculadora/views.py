@@ -98,7 +98,7 @@ class GuardarComoServicioView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        if Service.objects.filter(code=data["codigo"]).exists():
+        if data["codigo"] and Service.objects.filter(code=data["codigo"]).exists():
             return Response(
                 {"codigo": ["Ya existe un servicio con este código."]},
                 status=status.HTTP_400_BAD_REQUEST,

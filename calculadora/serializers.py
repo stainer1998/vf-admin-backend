@@ -100,7 +100,7 @@ class CalculoInputSerializer(serializers.Serializer):
 
 
 class GuardarServicioSerializer(serializers.Serializer):
-    codigo = serializers.CharField(max_length=20)
+    codigo = serializers.CharField(max_length=20, allow_blank=True, default="")
     nombre = serializers.CharField(max_length=200)
     descripcion = serializers.CharField(allow_blank=True, default="")
     datos_calculo = CalculoInputSerializer()
