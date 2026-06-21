@@ -79,10 +79,10 @@ class Product(models.Model):
 
     @property
     def margin(self):
-        if not self.sale_price:
-            return Decimal("0")
+        if not self.purchase_price:
+            return None
         profit = self.sale_price - self.purchase_price
-        return (profit / self.sale_price * 100).quantize(Decimal("0.01"))
+        return (profit / self.purchase_price * 100).quantize(Decimal("0.01"))
 
     @property
     def stock(self):

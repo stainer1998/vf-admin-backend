@@ -21,9 +21,9 @@ class Service(models.Model):
 
     @property
     def margin(self):
-        if not self.sale_price:
-            return Decimal("0")
-        return (self.gross_profit / self.sale_price * 100).quantize(Decimal("0.01"))
+        if not self.direct_cost:
+            return None
+        return (self.gross_profit / self.direct_cost * 100).quantize(Decimal("0.01"))
 
     def save(self, *args, **kwargs):
         is_new = self.pk is None
