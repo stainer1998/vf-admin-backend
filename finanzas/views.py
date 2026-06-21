@@ -9,11 +9,18 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from core.models import AllocationFund
-from .models import Allocation, AllocationDetail, FinancialTransaction, FundMovement
+from .models import (
+    Allocation, AlertaFinanciera, AllocationDetail, ExpenseCategory,
+    FinancialTransaction, FundMovement, GastoPendiente, GastoRecurrente,
+)
 from .serializers import (
+    AlertaFinancieraSerializer,
+    ExpenseCategorySerializer,
     FinancialTransactionListSerializer,
     FinancialTransactionSerializer,
     FundMovementSerializer,
+    GastoPendienteSerializer,
+    GastoRecurrenteSerializer,
 )
 
 
@@ -419,6 +426,247 @@ class FinancialTransactionViewSet(viewsets.ModelViewSet):
                 )
 
         return Response(FinancialTransactionSerializer(tx).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=["get"])
+    def proyeccion(self, request):
+        """Project income and expense for current month + next 2 months based on last 3 months avg."""
+        import calendar
+        today = date.today()
+
+        # ── Mes actual acumulado ──────────────────────────────────────────────
+        month_start = today.replace(day=1)
+        dias_mes = calendar.monthrange(today.year, today.month)[1]
+        dias_transcurridos = today.day
+
+        mes_actual_qs = FinancialTransaction.objects.filter(date__gte=month_start, date__lte=today)
+        income_real = float(mes_actual_qs.filter(transaction_type="INCOME").aggregate(s=Sum("amount"))["s"] or 0)
+        expense_real = float(mes_actual_qs.filter(transaction_type="EXPENSE").aggregate(s=Sum("amount"))["s"] or 0)
+
+        income_proy = round(income_real / dias_transcurridos * dias_mes, 2) if dias_transcurridos else 0
+        expense_proy = round(expense_real / dias_transcurridos * dias_mes, 2) if dias_transcurridos else 0
+
+        # ── Promedio últimos 3 meses completos ────────────────────────────────
+        three_m_data = []
+        for i in range(1, 4):
+            # go back i months
+            y, m = today.year, today.month - i
+            while m <= 0:
+                m += 12
+                y -= 1
+            m_start = date(y, m, 1)
+            m_end = date(y, m, calendar.monthrange(y, m)[1])
+            qs = FinancialTransaction.objects.filter(date__gte=m_start, date__lte=m_end)
+            three_m_data.append({
+                "income": float(qs.filter(transaction_type="INCOME").aggregate(s=Sum("amount"))["s"] or 0),
+                "expense": float(qs.filter(transaction_type="EXPENSE").aggregate(s=Sum("amount"))["s"] or 0),
+            })
+
+        avg_income = round(sum(d["income"] for d in three_m_data) / 3, 2)
+        avg_expense = round(sum(d["expense"] for d in three_m_data) / 3, 2)
+
+        # ── Próximos 2 meses ──────────────────────────────────────────────────
+        months_es = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+        proximos = []
+        for i in range(1, 3):
+            y, m = today.year, today.month + i
+            while m > 12:
+                m -= 12
+                y += 1
+            proximos.append({
+                "label": f"{months_es[m - 1]} {str(y)[2:]}",
+                "income_proyectado": avg_income,
+                "expense_proyectado": avg_expense,
+                "net_proyectado": round(avg_income - avg_expense, 2),
+            })
+
+        return Response({
+            "mes_actual": {
+                "label": f"{months_es[today.month - 1]} {str(today.year)[2:]}",
+                "income_real": income_real,
+                "expense_real": expense_real,
+                "income_proyectado": income_proy,
+                "expense_proyectado": expense_proy,
+                "net_proyectado": round(income_proy - expense_proy, 2),
+                "dias_transcurridos": dias_transcurridos,
+                "dias_totales": dias_mes,
+            },
+            "proximos": proximos,
+            "base_3m": {
+                "avg_income": avg_income,
+                "avg_expense": avg_expense,
+                "avg_net": round(avg_income - avg_expense, 2),
+            },
+        })
+
+
+class GastoRecurrenteViewSet(viewsets.ModelViewSet):
+    queryset = GastoRecurrente.objects.select_related("categoria").all()
+    serializer_class = GastoRecurrenteSerializer
+    pagination_class = None
+
+    @action(detail=False, methods=["get"])
+    def estado_mes(self, request):
+        """Lista todos los gastos recurrentes activos con flag si ya fueron aplicados este mes."""
+        today = date.today()
+        mes_inicio = today.replace(day=1)
+
+        recurrentes = GastoRecurrente.objects.filter(activo=True).select_related("categoria")
+        result = []
+        for gr in recurrentes:
+            aplicado = gr.transactions.filter(date__gte=mes_inicio).exists()
+            result.append({
+                "id": gr.pk,
+                "nombre": gr.nombre,
+                "descripcion": gr.descripcion,
+                "monto": float(gr.monto),
+                "categoria": gr.categoria_id,
+                "categoria_nombre": gr.categoria.name if gr.categoria else None,
+                "dia_del_mes": gr.dia_del_mes,
+                "aplicado": aplicado,
+                "vencido": today.day > gr.dia_del_mes and not aplicado,
+            })
+        return Response(result)
+
+    @action(detail=True, methods=["post"])
+    def aplicar(self, request, pk=None):
+        """Registra el gasto recurrente como FinancialTransaction(EXPENSE) para el mes actual."""
+        gr = self.get_object()
+        today = date.today()
+        mes_inicio = today.replace(day=1)
+
+        if gr.transactions.filter(date__gte=mes_inicio).exists():
+            return Response(
+                {"detail": "Este gasto ya fue registrado en el mes actual."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        tx = FinancialTransaction.objects.create(
+            transaction_type=FinancialTransaction.EXPENSE,
+            date=today,
+            amount=gr.monto,
+            description=gr.nombre,
+            category=gr.categoria,
+            gasto_recurrente=gr,
+        )
+        return Response(
+            {"id": tx.pk, "description": tx.description, "amount": float(tx.amount), "date": str(tx.date)},
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class GastoPendienteViewSet(viewsets.ModelViewSet):
+    queryset = GastoPendiente.objects.select_related("categoria", "work_order", "transaction").all()
+    serializer_class = GastoPendienteSerializer
+    filterset_fields = ["estado", "work_order"]
+    ordering = ["-created_at"]
+    pagination_class = None
+
+    @action(detail=True, methods=["post"])
+    def confirmar(self, request, pk=None):
+        """Confirma el gasto pendiente: crea FinancialTransaction(EXPENSE) y marca como CONFIRMADO."""
+        gp = self.get_object()
+        if gp.estado != GastoPendiente.PENDIENTE:
+            return Response(
+                {"detail": f"El gasto está en estado {gp.estado}, no se puede confirmar."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from django.utils import timezone
+        fecha = request.data.get("fecha") or str(date.today())
+
+        tx = FinancialTransaction.objects.create(
+            transaction_type=FinancialTransaction.EXPENSE,
+            date=fecha,
+            amount=gp.monto,
+            description=gp.descripcion,
+            category=gp.categoria,
+            work_order=gp.work_order,
+        )
+        gp.transaction = tx
+        gp.estado = GastoPendiente.CONFIRMADO
+        gp.confirmado_en = timezone.now()
+        gp.save(update_fields=["transaction", "estado", "confirmado_en"])
+
+        return Response(GastoPendienteSerializer(gp).data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"])
+    def cancelar(self, request, pk=None):
+        """Cancela el gasto pendiente sin generar transacción."""
+        gp = self.get_object()
+        if gp.estado != GastoPendiente.PENDIENTE:
+            return Response(
+                {"detail": f"El gasto está en estado {gp.estado}, no se puede cancelar."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        gp.estado = GastoPendiente.CANCELADO
+        gp.save(update_fields=["estado"])
+        return Response(GastoPendienteSerializer(gp).data)
+
+
+class AlertaFinancieraViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Evalúa el estado financiero actual, crea/auto-resuelve alertas y las devuelve.
+
+    GET /api/finanzas/alertas/           → evalúa + retorna alertas activas
+    POST /api/finanzas/alertas/{id}/resolver/  → marca alerta como resuelta manualmente
+    """
+    serializer_class = AlertaFinancieraSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        return AlertaFinanciera.objects.filter(activa=True)
+
+    def list(self, request, *args, **kwargs):
+        from .alertas import evaluar_alertas
+        from django.utils import timezone
+
+        hoy = date.today()
+        condiciones_activas = evaluar_alertas()
+        tipos_activos = {tipo for tipo, _, _ in condiciones_activas}
+
+        # Auto-crear alertas nuevas que no existan hoy
+        alertas_existentes = AlertaFinanciera.objects.filter(activa=True)
+        tipos_con_alerta = set(alertas_existentes.values_list("tipo", flat=True))
+
+        for tipo, severidad, mensaje in condiciones_activas:
+            if tipo not in tipos_con_alerta:
+                AlertaFinanciera.objects.create(
+                    tipo=tipo,
+                    severidad=severidad,
+                    mensaje=mensaje,
+                    fecha=hoy,
+                    activa=True,
+                )
+
+        # Auto-resolver alertas cuya condición ya no se cumple
+        alertas_a_resolver = alertas_existentes.exclude(tipo__in=tipos_activos)
+        alertas_a_resolver.update(activa=False, resuelta_en=timezone.now())
+
+        qs = AlertaFinanciera.objects.filter(activa=True).order_by(
+            # CRITICAL primero
+            "-severidad", "-fecha"
+        )
+        serializer = self.get_serializer(qs, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=["post"])
+    def resolver(self, request, pk=None):
+        from django.utils import timezone
+        alerta = self.get_object()
+        if not alerta.activa:
+            return Response({"detail": "La alerta ya está resuelta."}, status=status.HTTP_400_BAD_REQUEST)
+        alerta.activa = False
+        alerta.resuelta_en = timezone.now()
+        alerta.save(update_fields=["activa", "resuelta_en"])
+        return Response(self.get_serializer(alerta).data)
+
+
+class ExpenseCategoryViewSet(viewsets.ModelViewSet):
+    queryset = ExpenseCategory.objects.all()
+    serializer_class = ExpenseCategorySerializer
+    search_fields = ["name"]
+    ordering = ["order", "name"]
+    pagination_class = None  # always return full list
 
 
 class FundMovementViewSet(viewsets.ModelViewSet):
