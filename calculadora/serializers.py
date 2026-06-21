@@ -105,14 +105,14 @@ class GuardarServicioSerializer(serializers.Serializer):
     descripcion = serializers.CharField(allow_blank=True, default="")
     datos_calculo = CalculoInputSerializer()
     precio_final = serializers.DecimalField(
-        max_digits=10, decimal_places=2, min_value=Decimal("0")
+        max_digits=12, decimal_places=2, min_value=Decimal("0")
     )
 
 
 class ActualizarServicioSerializer(serializers.Serializer):
     datos_calculo = CalculoInputSerializer()
     precio_final = serializers.DecimalField(
-        max_digits=10, decimal_places=2, min_value=Decimal("0")
+        max_digits=12, decimal_places=2, min_value=Decimal("0")
     )
 
 
