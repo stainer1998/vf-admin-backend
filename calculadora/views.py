@@ -82,7 +82,7 @@ class CalcularView(APIView):
 
         HistorialCalculo.objects.create(
             usuario=request.user,
-            parametros_input=serializer.validated_data,
+            parametros_input={k: str(v) for k, v in serializer.validated_data.items()},
             resultado_calculo=resultado,
         )
         logger.info("Cálculo realizado por usuario=%s", request.user.username)
@@ -129,7 +129,7 @@ class GuardarComoServicioView(APIView):
 
         HistorialCalculo.objects.create(
             usuario=request.user,
-            parametros_input=data["datos_calculo"],
+            parametros_input={k: str(v) for k, v in data["datos_calculo"].items()},
             resultado_calculo=resultado,
             servicio_guardado=service,
         )
@@ -179,7 +179,7 @@ class ActualizarServicioView(APIView):
 
         HistorialCalculo.objects.create(
             usuario=request.user,
-            parametros_input=data["datos_calculo"],
+            parametros_input={k: str(v) for k, v in data["datos_calculo"].items()},
             resultado_calculo=resultado,
             servicio_guardado=service,
         )
