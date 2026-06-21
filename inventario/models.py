@@ -45,7 +45,7 @@ class ProductSupplier(models.Model):
         Supplier, on_delete=models.CASCADE, related_name="product_suppliers"
     )
     purchase_price = models.DecimalField(
-        max_digits=10, decimal_places=2, null=True, blank=True
+        max_digits=12, decimal_places=2, null=True, blank=True
     )
     is_preferred = models.BooleanField(default=False)
     notes = models.TextField(blank=True)
@@ -67,8 +67,8 @@ class Product(models.Model):
         "Brand", null=True, blank=True, on_delete=models.SET_NULL, related_name="products"
     )
     model = models.CharField(max_length=100, blank=True)
-    purchase_price = models.DecimalField(max_digits=10, decimal_places=2)
-    sale_price = models.DecimalField(max_digits=10, decimal_places=2)
+    purchase_price = models.DecimalField(max_digits=12, decimal_places=2)
+    sale_price = models.DecimalField(max_digits=12, decimal_places=2)
     suppliers = models.ManyToManyField(
         Supplier,
         through="ProductSupplier",
@@ -140,7 +140,7 @@ class InventoryMovement(models.Model):
     )
     movement_type = models.CharField(max_length=12, choices=TYPE_CHOICES)
     quantity = models.IntegerField()
-    unit_cost = models.DecimalField(max_digits=10, decimal_places=2)
+    unit_cost = models.DecimalField(max_digits=12, decimal_places=2)
     date = models.DateField()
     reference = models.CharField(max_length=200, blank=True)
     notes = models.TextField(blank=True)

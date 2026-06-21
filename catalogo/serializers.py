@@ -7,10 +7,10 @@ class ServiceMaterialSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True)
     product_code = serializers.CharField(source="product.code", read_only=True)
     sale_price = serializers.DecimalField(
-        source="product.sale_price", max_digits=10, decimal_places=2, read_only=True
+        source="product.sale_price", max_digits=12, decimal_places=2, read_only=True
     )
     purchase_price = serializers.DecimalField(
-        source="product.purchase_price", max_digits=10, decimal_places=2, read_only=True
+        source="product.purchase_price", max_digits=12, decimal_places=2, read_only=True
     )
 
     class Meta:

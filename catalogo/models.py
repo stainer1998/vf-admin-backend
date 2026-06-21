@@ -7,9 +7,9 @@ class Service(models.Model):
     code = models.CharField(max_length=20, unique=True, blank=True)
     name = models.CharField(max_length=200)
     description = models.TextField(blank=True)
-    sale_price = models.DecimalField(max_digits=10, decimal_places=2)
+    sale_price = models.DecimalField(max_digits=12, decimal_places=2)
     direct_cost = models.DecimalField(
-        max_digits=10, decimal_places=2, default=Decimal("0")
+        max_digits=12, decimal_places=2, default=Decimal("0")
     )
     is_active = models.BooleanField(default=True)
     notes = models.TextField(blank=True)

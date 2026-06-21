@@ -45,7 +45,7 @@ class Quote(models.Model):
     date = models.DateField()
     validity_days = models.PositiveSmallIntegerField(default=15)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=DRAFT)
-    iva = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0"))
+    iva = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0"))
     notes = models.TextField(blank=True)
 
     @property
@@ -80,8 +80,8 @@ class QuoteLine(models.Model):
     )
     # snapshot — frozen at creation, independent of catalog changes
     description = models.CharField(max_length=300)
-    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
-    unit_cost = models.DecimalField(max_digits=10, decimal_places=2)
+    unit_price = models.DecimalField(max_digits=12, decimal_places=2)
+    unit_cost = models.DecimalField(max_digits=12, decimal_places=2)
     quantity = models.PositiveSmallIntegerField(default=1)
 
     class Meta:

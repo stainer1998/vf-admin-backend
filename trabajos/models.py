@@ -78,7 +78,7 @@ class WorkOrder(models.Model):
         max_length=10, choices=PAYMENT_METHOD_CHOICES, blank=True
     )
     adjustment = models.DecimalField(
-        max_digits=10, decimal_places=2, default=Decimal("0")
+        max_digits=12, decimal_places=2, default=Decimal("0")
     )
     work_description = models.TextField(blank=True)
     notes = models.TextField(blank=True)
@@ -119,8 +119,8 @@ class WorkOrderLine(models.Model):
     )
     # snapshot — frozen at creation, independent of catalog changes
     description = models.CharField(max_length=300)
-    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
-    unit_cost = models.DecimalField(max_digits=10, decimal_places=2)
+    unit_price = models.DecimalField(max_digits=12, decimal_places=2)
+    unit_cost = models.DecimalField(max_digits=12, decimal_places=2)
     quantity = models.PositiveSmallIntegerField(default=1)
 
     class Meta:

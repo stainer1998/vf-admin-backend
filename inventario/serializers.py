@@ -33,7 +33,7 @@ class ProductSupplierSerializer(serializers.ModelSerializer):
 class ProductSupplierWriteSerializer(serializers.Serializer):
     supplier = serializers.PrimaryKeyRelatedField(queryset=Supplier.objects.all())
     purchase_price = serializers.DecimalField(
-        max_digits=10, decimal_places=2, required=False, allow_null=True
+        max_digits=12, decimal_places=2, required=False, allow_null=True
     )
     is_preferred = serializers.BooleanField(default=False)
     notes = serializers.CharField(required=False, allow_blank=True, default="")
