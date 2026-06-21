@@ -132,22 +132,23 @@ def import_lookout_json(data: dict, user) -> tuple[Diagnosis, bool]:
         },
     )
 
-    # --- Diagnosis (atomic — captura hash duplicado) ---
+    # --- Diagnosis (savepoint anidado — captura hash duplicado sin romper la tx) ---
     content_hash = hashlib.sha256(
         json.dumps(data, sort_keys=True).encode()
     ).hexdigest()
 
     with transaction.atomic():
         try:
-            diagnosis = Diagnosis.objects.create(
-                equipment=equipment,
-                timestamp=data.get("timestamp_inicio"),
-                source_file=data.get("archivo_origen", ""),
-                schema_version=data.get("version_schema", ""),
-                raw_json=data,
-                ingress_source=Diagnosis.LOOKOUT,
-                imported_by=user,
-            )
+            with transaction.atomic():  # savepoint: si falla, solo revierte esto
+                diagnosis = Diagnosis.objects.create(
+                    equipment=equipment,
+                    timestamp=data.get("timestamp_inicio"),
+                    source_file=data.get("archivo_origen", ""),
+                    schema_version=data.get("version_schema", ""),
+                    raw_json=data,
+                    ingress_source=Diagnosis.LOOKOUT,
+                    imported_by=user,
+                )
         except IntegrityError:
             existing = Diagnosis.objects.get(content_hash=content_hash)
             return existing, False
