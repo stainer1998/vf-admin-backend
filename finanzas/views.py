@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 from decimal import Decimal
 
-from django.db.models import Case, DecimalField, Q, Sum, When
+from django.db.models import Case, DecimalField, ExpressionWrapper, F, Q, Sum, When
 from django.db.models.functions import TruncMonth
 from rest_framework import serializers as drf_serializers
 from rest_framework import status, viewsets
@@ -107,10 +107,31 @@ class FinancialTransactionViewSet(viewsets.ModelViewSet):
             transaction_type=FinancialTransaction.EXPENSE
         ).aggregate(t=Sum("amount"))["t"] or Decimal("0")
 
-        from trabajos.models import WorkOrder
+        from trabajos.models import WorkOrder, WorkOrderLine
         pending_ots = WorkOrder.objects.filter(payment_status=WorkOrder.PENDING)
         pending_count = pending_ots.count()
         pending_amount = sum(ot.amount_charged for ot in pending_ots)
+
+        delivered_ids = list(WorkOrder.objects.filter(
+            work_status=WorkOrder.DELIVERED,
+            intake_date__gte=month_start,
+        ).values_list("id", flat=True))
+        facturado_lineas = (
+            WorkOrderLine.objects.filter(work_order_id__in=delivered_ids)
+            .aggregate(total=Sum(ExpressionWrapper(
+                F("unit_price") * F("quantity"),
+                output_field=DecimalField(max_digits=12, decimal_places=2),
+            )))["total"]
+            or Decimal("0")
+        )
+        facturado_ajustes = (
+            WorkOrder.objects.filter(
+                work_status=WorkOrder.DELIVERED,
+                intake_date__gte=month_start,
+            ).aggregate(total=Sum("adjustment"))["total"]
+            or Decimal("0")
+        )
+        total_facturado = facturado_lineas + facturado_ajustes
 
         return Response({
             "monthly": all_months,
@@ -121,6 +142,7 @@ class FinancialTransactionViewSet(viewsets.ModelViewSet):
                 "net": float(income_month - expense_month),
                 "pending_ots_count": pending_count,
                 "pending_ots_amount": float(pending_amount),
+                "total_facturado": float(total_facturado),
             },
         })
 
