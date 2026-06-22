@@ -41,6 +41,7 @@ class QuoteSerializer(serializers.ModelSerializer):
     total = serializers.SerializerMethodField()
     client_name = serializers.CharField(source="client.__str__", read_only=True)
     work_order_id = serializers.SerializerMethodField()
+    equipment_label = serializers.SerializerMethodField()
 
     class Meta:
         model = Quote
@@ -50,6 +51,7 @@ class QuoteSerializer(serializers.ModelSerializer):
             "client",
             "client_name",
             "equipment",
+            "equipment_label",
             "source_diagnosis",
             "date",
             "validity_days",
@@ -72,6 +74,9 @@ class QuoteSerializer(serializers.ModelSerializer):
     def get_work_order_id(self, obj):
         wo = obj.work_orders.first()
         return wo.pk if wo else None
+
+    def get_equipment_label(self, obj):
+        return str(obj.equipment) if obj.equipment else None
 
     def create(self, validated_data):
         lines_data = validated_data.pop("lines", [])
