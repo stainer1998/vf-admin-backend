@@ -52,6 +52,7 @@ class QuoteViewSet(viewsets.ModelViewSet):
                 source_quote=quote,
                 intake_date=intake_date_raw,
                 work_description=quote.notes,
+                notes=f"Generada desde {quote.folio} · Total cotizado: ${quote.total:,.0f}",
             )
             WorkOrderLine.objects.bulk_create([
                 WorkOrderLine(
