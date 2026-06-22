@@ -40,6 +40,7 @@ class QuoteSerializer(serializers.ModelSerializer):
     subtotal = serializers.SerializerMethodField()
     total = serializers.SerializerMethodField()
     client_name = serializers.CharField(source="client.__str__", read_only=True)
+    work_order_id = serializers.SerializerMethodField()
 
     class Meta:
         model = Quote
@@ -58,6 +59,7 @@ class QuoteSerializer(serializers.ModelSerializer):
             "subtotal",
             "total",
             "lines",
+            "work_order_id",
         ]
         read_only_fields = ["folio"]
 
@@ -66,6 +68,10 @@ class QuoteSerializer(serializers.ModelSerializer):
 
     def get_total(self, obj):
         return obj.total
+
+    def get_work_order_id(self, obj):
+        wo = obj.work_orders.first()
+        return wo.pk if wo else None
 
     def create(self, validated_data):
         lines_data = validated_data.pop("lines", [])
