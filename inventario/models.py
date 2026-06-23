@@ -9,6 +9,7 @@ class ProductCategory(models.Model):
     code_prefix = models.CharField(max_length=4, blank=True)
     is_stockable = models.BooleanField(default=True)
     description = models.TextField(blank=True)
+    spec_schema = models.JSONField(default=list, blank=True)
 
     class Meta:
         verbose_name_plural = "product categories"
@@ -75,6 +76,7 @@ class Product(models.Model):
         related_name="products",
         blank=True,
     )
+    specifications = models.JSONField(default=dict, blank=True)
     notes = models.TextField(blank=True)
 
     @property
