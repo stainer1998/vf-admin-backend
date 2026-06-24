@@ -18,6 +18,8 @@ class EquipmentSerializer(serializers.ModelSerializer):
             "model",
             "serial_number",
             "year",
+            "color",
+            "specifications",
             "identity_key",
             "is_ambiguous",
             "created_at",

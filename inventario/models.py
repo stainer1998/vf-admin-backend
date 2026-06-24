@@ -9,6 +9,7 @@ class ProductCategory(models.Model):
     name = models.CharField(max_length=100, unique=True)
     code_prefix = models.CharField(max_length=4, blank=True)
     is_stockable = models.BooleanField(default=True)
+    is_equipment_component = models.BooleanField(default=False)
     description = models.TextField(blank=True)
     spec_schema = models.JSONField(default=list, blank=True)
 

@@ -32,7 +32,7 @@ class ProductCategoryViewSet(viewsets.ModelViewSet):
     queryset = ProductCategory.objects.all()
     serializer_class = ProductCategorySerializer
     search_fields = ["name"]
-    filterset_fields = ["is_stockable"]
+    filterset_fields = ["is_stockable", "is_equipment_component"]
 
 
 class SupplierViewSet(viewsets.ModelViewSet):

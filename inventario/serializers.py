@@ -9,7 +9,7 @@ from .models import (
 class ProductCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductCategory
-        fields = ["id", "name", "code_prefix", "is_stockable", "description", "spec_schema"]
+        fields = ["id", "name", "code_prefix", "is_stockable", "is_equipment_component", "description", "spec_schema"]
 
 
 class SupplierSerializer(serializers.ModelSerializer):

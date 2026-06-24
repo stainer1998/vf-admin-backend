@@ -35,6 +35,8 @@ class Equipment(models.Model):
     model = models.CharField(max_length=200)
     serial_number = models.CharField(max_length=200, blank=True)
     year = models.PositiveSmallIntegerField(null=True, blank=True)
+    color = models.CharField(max_length=50, blank=True)
+    specifications = models.JSONField(default=dict, blank=True)
     identity_key = models.CharField(max_length=200, unique=True, db_index=True)
     is_ambiguous = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
