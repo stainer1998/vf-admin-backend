@@ -1,6 +1,9 @@
 from django.contrib import admin
 
-from .models import InventoryMovement, Product, ProductCategory, ProductSupplier, Supplier
+from .models import (
+    InventoryMovement, Product, ProductCategory,
+    ProductSupplier, PurchaseOrder, PurchaseOrderLine, Supplier,
+)
 
 
 @admin.register(ProductCategory)
@@ -56,3 +59,20 @@ class InventoryMovementAdmin(admin.ModelAdmin):
     search_fields = ["product__name", "product__code", "reference"]
     date_hierarchy = "date"
     autocomplete_fields = ["product"]
+
+
+class PurchaseOrderLineInline(admin.TabularInline):
+    model = PurchaseOrderLine
+    extra = 0
+    fields = ["product", "description", "unit_cost", "quantity_ordered", "quantity_received"]
+    readonly_fields = ["quantity_received"]
+
+
+@admin.register(PurchaseOrder)
+class PurchaseOrderAdmin(admin.ModelAdmin):
+    list_display = ["number", "supplier", "date", "status", "created_at"]
+    list_filter = ["status", "supplier"]
+    search_fields = ["number", "supplier__name"]
+    readonly_fields = ["number", "created_at"]
+    date_hierarchy = "date"
+    inlines = [PurchaseOrderLineInline]

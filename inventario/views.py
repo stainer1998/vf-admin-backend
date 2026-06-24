@@ -1,14 +1,23 @@
+from datetime import date
+
 from django.db.models import Prefetch
-from rest_framework import viewsets
+from django.shortcuts import get_object_or_404
+from rest_framework import serializers as drf_serializers
+from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from .models import Brand, InventoryMovement, Product, ProductCategory, ProductSupplier, Supplier
+from .models import (
+    Brand, InventoryMovement, Product, ProductCategory,
+    ProductSupplier, PurchaseOrder, PurchaseOrderLine, Supplier,
+)
 from .serializers import (
     BrandSerializer,
     InventoryMovementSerializer,
     ProductCategorySerializer,
     ProductSerializer,
+    PurchaseOrderListSerializer,
+    PurchaseOrderSerializer,
     SupplierSerializer,
 )
 
@@ -85,3 +94,113 @@ class InventoryMovementViewSet(viewsets.ModelViewSet):
     search_fields = ["reference"]
     ordering_fields = ["date", "quantity"]
     ordering = ["-date"]
+
+
+class PurchaseOrderViewSet(viewsets.ModelViewSet):
+    queryset = (
+        PurchaseOrder.objects
+        .select_related("supplier")
+        .prefetch_related("lines__product")
+        .all()
+    )
+    filterset_fields = ["status", "supplier"]
+    search_fields = ["number", "supplier__name"]
+    ordering_fields = ["date", "created_at"]
+    ordering = ["-created_at"]
+
+    def get_serializer_class(self):
+        if self.action == "list":
+            return PurchaseOrderListSerializer
+        return PurchaseOrderSerializer
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.status != PurchaseOrder.DRAFT:
+            return Response(
+                {"detail": "Solo se pueden editar órdenes en borrador."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.status != PurchaseOrder.DRAFT:
+            return Response(
+                {"detail": "Solo se pueden eliminar órdenes en borrador."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return super().destroy(request, *args, **kwargs)
+
+    @action(detail=True, methods=["post"])
+    def confirm(self, request, pk=None):
+        po = self.get_object()
+        if po.status != PurchaseOrder.DRAFT:
+            return Response(
+                {"detail": "Solo se pueden confirmar órdenes en borrador."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        po.status = PurchaseOrder.CONFIRMED
+        po.save()
+        return Response(PurchaseOrderSerializer(po).data)
+
+    @action(detail=True, methods=["post"])
+    def cancel(self, request, pk=None):
+        po = self.get_object()
+        if po.status in (PurchaseOrder.RECEIVED, PurchaseOrder.CANCELLED):
+            return Response(
+                {"detail": "No se puede cancelar una orden ya recibida o cancelada."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        po.status = PurchaseOrder.CANCELLED
+        po.save()
+        return Response(PurchaseOrderSerializer(po).data)
+
+    @action(detail=True, methods=["post"], url_path="receive-line")
+    def receive_line(self, request, pk=None):
+        po = self.get_object()
+        if po.status not in (PurchaseOrder.CONFIRMED, PurchaseOrder.PARTIALLY_RECEIVED):
+            return Response(
+                {"detail": "La orden debe estar Confirmada para recibir mercadería."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        line_id = request.data.get("line_id")
+        try:
+            quantity = int(request.data.get("quantity", 0))
+        except (TypeError, ValueError):
+            return Response({"detail": "Cantidad inválida."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not line_id:
+            return Response({"detail": "line_id es requerido."}, status=status.HTTP_400_BAD_REQUEST)
+
+        line = get_object_or_404(PurchaseOrderLine, pk=line_id, purchase_order=po)
+
+        if quantity <= 0:
+            return Response({"detail": "La cantidad debe ser mayor a cero."}, status=status.HTTP_400_BAD_REQUEST)
+        if quantity > line.pending_quantity:
+            return Response(
+                {"detail": f"Cantidad excede el pendiente ({line.pending_quantity})."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        InventoryMovement.objects.create(
+            product=line.product,
+            movement_type=InventoryMovement.ENTRY,
+            quantity=quantity,
+            unit_cost=line.unit_cost,
+            date=date.today(),
+            reference=po.number,
+            notes=f"Recepción OC {po.number}",
+        )
+
+        line.quantity_received += quantity
+        line.save()
+
+        lines = list(po.lines.all())
+        if all(l.is_fully_received for l in lines):
+            po.status = PurchaseOrder.RECEIVED
+        else:
+            po.status = PurchaseOrder.PARTIALLY_RECEIVED
+        po.save()
+
+        return Response(PurchaseOrderSerializer(po).data)

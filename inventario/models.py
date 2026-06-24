@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.db import models
 from django.db.models import Case, F, IntegerField, Sum, When
+from django.utils import timezone
 
 
 class ProductCategory(models.Model):
@@ -152,3 +153,76 @@ class InventoryMovement(models.Model):
             f"{self.get_movement_type_display()} {self.quantity}x"
             f" {self.product} ({self.date})"
         )
+
+
+class PurchaseOrder(models.Model):
+    DRAFT = "DRAFT"
+    CONFIRMED = "CONFIRMED"
+    PARTIALLY_RECEIVED = "PARTIALLY_RECEIVED"
+    RECEIVED = "RECEIVED"
+    CANCELLED = "CANCELLED"
+    STATUS_CHOICES = [
+        (DRAFT, "Borrador"),
+        (CONFIRMED, "Confirmada"),
+        (PARTIALLY_RECEIVED, "Recibida parcialmente"),
+        (RECEIVED, "Recibida"),
+        (CANCELLED, "Cancelada"),
+    ]
+
+    number = models.CharField(max_length=20, unique=True, blank=True)
+    supplier = models.ForeignKey(
+        Supplier, on_delete=models.PROTECT, related_name="purchase_orders"
+    )
+    date = models.DateField()
+    expected_date = models.DateField(null=True, blank=True)
+    status = models.CharField(max_length=25, choices=STATUS_CHOICES, default=DRAFT)
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def save(self, *args, **kwargs):
+        if not self.number:
+            year = timezone.now().year
+            count = PurchaseOrder.objects.filter(date__year=year).count()
+            self.number = f"OC-{year}-{count + 1:04d}"
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.number} — {self.supplier}"
+
+
+class PurchaseOrderLine(models.Model):
+    purchase_order = models.ForeignKey(
+        PurchaseOrder, on_delete=models.CASCADE, related_name="lines"
+    )
+    product = models.ForeignKey(
+        Product, on_delete=models.PROTECT, related_name="purchase_lines"
+    )
+    description = models.CharField(max_length=200)
+    unit_cost = models.DecimalField(max_digits=12, decimal_places=2)
+    quantity_ordered = models.PositiveIntegerField()
+    quantity_received = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["id"]
+
+    @property
+    def pending_quantity(self):
+        return max(0, self.quantity_ordered - self.quantity_received)
+
+    @property
+    def is_fully_received(self):
+        return self.quantity_received >= self.quantity_ordered
+
+    @property
+    def total_ordered(self):
+        return self.unit_cost * self.quantity_ordered
+
+    @property
+    def total_received(self):
+        return self.unit_cost * self.quantity_received
+
+    def __str__(self):
+        return f"{self.product.name} x{self.quantity_ordered} @ {self.unit_cost}"

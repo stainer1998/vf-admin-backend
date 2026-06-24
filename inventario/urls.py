@@ -5,6 +5,7 @@ from .views import (
     InventoryMovementViewSet,
     ProductCategoryViewSet,
     ProductViewSet,
+    PurchaseOrderViewSet,
     SupplierViewSet,
 )
 
@@ -14,5 +15,6 @@ router.register("product-categories", ProductCategoryViewSet, basename="productc
 router.register("suppliers", SupplierViewSet, basename="supplier")
 router.register("products", ProductViewSet, basename="product")
 router.register("inventory-movements", InventoryMovementViewSet, basename="inventorymovement")
+router.register("purchase-orders", PurchaseOrderViewSet, basename="purchaseorder")
 
 urlpatterns = router.urls
