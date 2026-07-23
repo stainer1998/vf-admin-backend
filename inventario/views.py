@@ -1,5 +1,6 @@
 from datetime import date
 
+from django.db import transaction
 from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
 from rest_framework import serializers as drf_serializers
@@ -202,5 +203,37 @@ class PurchaseOrderViewSet(viewsets.ModelViewSet):
         else:
             po.status = PurchaseOrder.PARTIALLY_RECEIVED
         po.save()
+
+        return Response(PurchaseOrderSerializer(po).data)
+
+    @action(detail=True, methods=["post"], url_path="receive-all")
+    def receive_all(self, request, pk=None):
+        po = self.get_object()
+        if po.status not in (PurchaseOrder.CONFIRMED, PurchaseOrder.PARTIALLY_RECEIVED):
+            return Response(
+                {"detail": "La orden debe estar Confirmada para recibir mercadería."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        pending_lines = [line for line in po.lines.all() if line.pending_quantity > 0]
+        if not pending_lines:
+            return Response({"detail": "No hay líneas pendientes por recibir."}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            for line in pending_lines:
+                InventoryMovement.objects.create(
+                    product=line.product,
+                    movement_type=InventoryMovement.ENTRY,
+                    quantity=line.pending_quantity,
+                    unit_cost=line.unit_cost,
+                    date=date.today(),
+                    reference=po.number,
+                    notes=f"Recepción OC {po.number}",
+                )
+                line.quantity_received = line.quantity_ordered
+                line.save()
+
+            po.status = PurchaseOrder.RECEIVED
+            po.save()
 
         return Response(PurchaseOrderSerializer(po).data)
