@@ -61,12 +61,29 @@ class ReceiveAllPurchaseOrderTests(TestCase):
         resp = self.client.post(f"/api/purchase-orders/{self.po.id}/receive-all/", format="json")
         self.assertEqual(resp.status_code, 400)
 
-    def test_receive_all_rejected_when_nothing_pending(self):
+    def test_receive_all_reconciles_stale_status_when_nothing_pending(self):
+        # Simulates quantities corrected outside this endpoint (e.g. admin),
+        # leaving quantity_received complete but the order status stale.
         self.line_a.quantity_received = self.line_a.quantity_ordered
         self.line_a.save()
         self.line_b.quantity_received = self.line_b.quantity_ordered
         self.line_b.save()
+        self.po.status = PurchaseOrder.PARTIALLY_RECEIVED
+        self.po.save()
 
+        movements_before = self.product_a.movements.count() + self.product_b.movements.count()
+
+        resp = self.client.post(f"/api/purchase-orders/{self.po.id}/receive-all/", format="json")
+        self.assertEqual(resp.status_code, 200, resp.content)
+
+        self.po.refresh_from_db()
+        self.assertEqual(self.po.status, PurchaseOrder.RECEIVED)
+        movements_after = self.product_a.movements.count() + self.product_b.movements.count()
+        self.assertEqual(movements_before, movements_after)  # no duplicate stock movements
+
+    def test_receive_all_rejected_when_no_lines(self):
+        self.line_a.delete()
+        self.line_b.delete()
         resp = self.client.post(f"/api/purchase-orders/{self.po.id}/receive-all/", format="json")
         self.assertEqual(resp.status_code, 400)
 

@@ -215,9 +215,18 @@ class PurchaseOrderViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        pending_lines = [line for line in po.lines.all() if line.pending_quantity > 0]
+        lines = list(po.lines.all())
+        if not lines:
+            return Response({"detail": "La orden no tiene líneas."}, status=status.HTTP_400_BAD_REQUEST)
+
+        pending_lines = [line for line in lines if line.pending_quantity > 0]
         if not pending_lines:
-            return Response({"detail": "No hay líneas pendientes por recibir."}, status=status.HTTP_400_BAD_REQUEST)
+            # Every line is already fully received (e.g. quantities were
+            # corrected outside this endpoint) but the order status is stale.
+            # Reconcile it instead of erroring — there's nothing left to move.
+            po.status = PurchaseOrder.RECEIVED
+            po.save()
+            return Response(PurchaseOrderSerializer(po).data)
 
         with transaction.atomic():
             for line in pending_lines:
